@@ -11,6 +11,7 @@ import (
 	"github.com/whaeh/whaeh/pkg/config"
 	"github.com/whaeh/whaeh/pkg/input"
 	"github.com/whaeh/whaeh/pkg/output"
+	"golang.org/x/term"
 )
 
 var (
@@ -47,12 +48,23 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 		var response bytes.Buffer
-		if err := p.StreamCompletion(context.Background(), ai.ProviderRequest{
+		var processing *loader
+		if term.IsTerminal(int(os.Stderr.Fd())) {
+			processing = startLoader(os.Stderr)
+		}
+		err = p.StreamCompletion(context.Background(), ai.ProviderRequest{
 			Prompt:  argsString(args),
 			Context: contextText,
 			Model:   cfg.Model,
-		}, &response); err != nil {
+		}, &response)
+		if err != nil {
+			if processing != nil {
+				processing.stopLoader()
+			}
 			return fmt.Errorf("completion failed: %w", err)
+		}
+		if processing != nil {
+			processing.stopLoader()
 		}
 		return output.NewRenderer(raw).Render(response.String(), os.Stdout)
 	},
