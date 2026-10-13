@@ -1,4 +1,11 @@
-# whaeh
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <img src="assets/logo.png" width="220" alt="Whaeh logo">
+  </picture>
+</p>
+
+<h1 align="center">whaeh</h1>
 
 `whaeh` is a Unix-style CLI for asking an AI about piped input or files.
 
