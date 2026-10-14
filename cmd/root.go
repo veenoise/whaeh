@@ -100,7 +100,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&filePath, "file", "f", "", "read context from a file")
 	rootCmd.Flags().StringVarP(&model, "model", "m", "", "model override")
 	rootCmd.Flags().StringVarP(&provider, "provider", "p", "", "provider override (gemini, openai, ollama)")
-	rootCmd.Flags().BoolVar(&raw, "raw", false, "disable terminal markdown rendering")
+	rootCmd.Flags().BoolVarP(&raw, "raw", "r", false, "disable terminal markdown rendering (stream raw)")
 	rootCmd.AddCommand(configCmd, versionCmd)
 }
 
