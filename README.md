@@ -19,12 +19,10 @@
   - [Google Gemini](https://ai.google.dev/)
   - [OpenAI](https://platform.openai.com/)
 
-### Install from source
+### Install with Go
 
 ```sh
-git clone https://github.com/veenoise/whaeh.git
-cd whaeh
-go install .
+go install github.com/veenoise/whaeh@latest
 ```
 
 The `whaeh` executable is installed in Go's binary directory. Make sure that
@@ -32,6 +30,14 @@ directory is on your `PATH`, then verify the installation:
 
 ```sh
 whaeh version
+```
+
+### Install from source
+
+```sh
+git clone https://github.com/veenoise/whaeh.git
+cd whaeh
+go install .
 ```
 
 To build a local executable instead:
