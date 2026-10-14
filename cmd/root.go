@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/veenoise/whaeh/pkg/ai"
@@ -47,26 +50,49 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var response bytes.Buffer
+
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+
 		var processing *loader
 		if term.IsTerminal(int(os.Stderr.Fd())) {
 			processing = startLoader(os.Stderr)
 		}
-		err = p.StreamCompletion(context.Background(), ai.ProviderRequest{
-			Prompt:  argsString(args),
-			Context: contextText,
-			Model:   cfg.Model,
-		}, &response)
-		if err != nil {
+		defer func() {
 			if processing != nil {
 				processing.stopLoader()
 			}
+		}()
+
+		isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+		var response bytes.Buffer
+		var out io.Writer = &response
+
+		if raw || !isTTY {
+			out = output.NewStreamWriter(os.Stdout, func() {
+				if processing != nil {
+					processing.stopLoader()
+				}
+			})
+		}
+
+		err = p.StreamCompletion(ctx, ai.ProviderRequest{
+			Prompt:  strings.Join(args, " "),
+			Context: contextText,
+			Model:   cfg.Model,
+		}, out)
+		if err != nil {
 			return fmt.Errorf("completion failed: %w", err)
 		}
+
 		if processing != nil {
 			processing.stopLoader()
 		}
-		return output.NewRenderer(raw).Render(response.String(), os.Stdout)
+
+		if !raw && isTTY {
+			return output.Render(response.String(), os.Stdout)
+		}
+		return nil
 	},
 }
 
@@ -83,15 +109,4 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, "whaeh:", err)
 		os.Exit(1)
 	}
-}
-
-func argsString(args []string) string {
-	result := ""
-	for i, arg := range args {
-		if i > 0 {
-			result += " "
-		}
-		result += arg
-	}
-	return result
 }

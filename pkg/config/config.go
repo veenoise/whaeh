@@ -6,38 +6,47 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Provider string `mapstructure:"provider"`
-	Model    string `mapstructure:"model"`
-	APIKey   string `mapstructure:"api_key"`
-	BaseURL  string `mapstructure:"base_url"`
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
+	APIKey   string `yaml:"api_key"`
+	BaseURL  string `yaml:"base_url"`
 }
 
 func Load() (Config, error) {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix("WHAEH")
-	viper.AutomaticEnv()
-	viper.SetDefault("provider", "ollama")
-	viper.SetDefault("model", "llama3.2")
-	viper.SetDefault("base_url", "")
-	viper.AddConfigPath(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh"))
-	if home, err := os.UserHomeDir(); err == nil {
-		viper.AddConfigPath(filepath.Join(home, ".whaeh"))
+	cfg := Config{
+		Provider: "ollama",
+		Model:    "llama3.2",
 	}
-	if err := viper.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !isConfigNotFound(err, &notFound) {
-			return Config{}, fmt.Errorf("read config: %w", err)
+
+	for _, p := range configPaths() {
+		data, err := os.ReadFile(p)
+		if err == nil {
+			if err := yaml.Unmarshal(data, &cfg); err != nil {
+				return Config{}, fmt.Errorf("decode config %s: %w", p, err)
+			}
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Config{}, fmt.Errorf("read config %s: %w", p, err)
 		}
 	}
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return Config{}, fmt.Errorf("decode config: %w", err)
+
+	if v := os.Getenv("WHAEH_PROVIDER"); v != "" {
+		cfg.Provider = v
 	}
+	if v := os.Getenv("WHAEH_MODEL"); v != "" {
+		cfg.Model = v
+	}
+	if v := os.Getenv("WHAEH_API_KEY"); v != "" {
+		cfg.APIKey = v
+	}
+	if v := os.Getenv("WHAEH_BASE_URL"); v != "" {
+		cfg.BaseURL = v
+	}
+
 	if cfg.APIKey == "" {
 		cfg.APIKey = os.Getenv(providerEnv(cfg.Provider))
 	}
@@ -45,22 +54,40 @@ func Load() (Config, error) {
 }
 
 func Save(cfg Config) error {
-	viper.Set("provider", cfg.Provider)
-	viper.Set("model", cfg.Model)
-	viper.Set("api_key", cfg.APIKey)
-	viper.Set("base_url", cfg.BaseURL)
-	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh")
-	if path == filepath.Join("", "whaeh") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		path = filepath.Join(home, ".whaeh")
-	}
-	if err := os.MkdirAll(path, 0o700); err != nil {
+	dir, err := configDir()
+	if err != nil {
 		return err
 	}
-	return viper.WriteConfigAs(filepath.Join(path, "config.yaml"))
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "config.yaml"), data, 0o600)
+}
+
+func configDir() (string, error) {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "whaeh"), nil
+	}
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, "whaeh"), nil
+}
+
+func configPaths() []string {
+	var paths []string
+	if dir, err := configDir(); err == nil {
+		paths = append(paths, filepath.Join(dir, "config.yaml"))
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".whaeh", "config.yaml"))
+	}
+	return paths
 }
 
 func providerEnv(provider string) string {
@@ -72,8 +99,4 @@ func providerEnv(provider string) string {
 	default:
 		return ""
 	}
-}
-
-func isConfigNotFound(err error, target *viper.ConfigFileNotFoundError) bool {
-	return errors.As(err, target)
 }

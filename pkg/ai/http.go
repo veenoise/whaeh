@@ -6,11 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
+var defaultClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ResponseHeaderTimeout: 60 * time.Second,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+	},
+}
+
 func doJSON(ctx context.Context, client *http.Client, method, url string, headers map[string]string, body any) (*http.Response, error) {
+	if client == nil {
+		client = defaultClient
+	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
