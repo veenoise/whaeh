@@ -7,10 +7,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/whaeh/whaeh/pkg/ai"
-	"github.com/whaeh/whaeh/pkg/config"
-	"github.com/whaeh/whaeh/pkg/input"
-	"github.com/whaeh/whaeh/pkg/output"
+	"github.com/veenoise/whaeh/pkg/ai"
+	"github.com/veenoise/whaeh/pkg/config"
+	"github.com/veenoise/whaeh/pkg/input"
+	"github.com/veenoise/whaeh/pkg/output"
 	"golang.org/x/term"
 )
 

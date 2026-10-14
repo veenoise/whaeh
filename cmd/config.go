@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/whaeh/whaeh/pkg/config"
+	"github.com/veenoise/whaeh/pkg/config"
 )
 
 var configCmd = &cobra.Command{

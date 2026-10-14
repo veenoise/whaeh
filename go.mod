@@ -1,4 +1,4 @@
-module github.com/whaeh/whaeh
+module github.com/veenoise/whaeh
 
 go 1.23
 

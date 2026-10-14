@@ -1,6 +1,6 @@
 package main
 
-import "github.com/whaeh/whaeh/cmd"
+import "github.com/veenoise/whaeh/cmd"
 
 func main() {
 	cmd.Execute()
