@@ -9,11 +9,18 @@ import (
 	"github.com/spf13/viper"
 )
 
+const DefaultSystemPrompt = `You are a Unix CLI assistant embedded in a command-line pipeline.
+- Be direct and concise. Skip pleasantries, introductions, and filler.
+- When analyzing code, diffs, or logs: pinpoint root causes, errors, and supply exact, minimal code or commands.
+- For general questions: provide accurate, direct answers without unnecessary fluff.
+- Format output with clean, readable Markdown for terminal display.`
+
 type Config struct {
-	Provider string `mapstructure:"provider"`
-	Model    string `mapstructure:"model"`
-	APIKey   string `mapstructure:"api_key"`
-	BaseURL  string `mapstructure:"base_url"`
+	Provider     string `mapstructure:"provider"`
+	Model        string `mapstructure:"model"`
+	APIKey       string `mapstructure:"api_key"`
+	BaseURL      string `mapstructure:"base_url"`
+	SystemPrompt string `mapstructure:"system_prompt"`
 }
 
 func Load() (Config, error) {
@@ -24,6 +31,7 @@ func Load() (Config, error) {
 	viper.SetDefault("provider", "ollama")
 	viper.SetDefault("model", "llama3.2")
 	viper.SetDefault("base_url", "")
+	viper.SetDefault("system_prompt", DefaultSystemPrompt)
 	viper.AddConfigPath(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh"))
 	if home, err := os.UserHomeDir(); err == nil {
 		viper.AddConfigPath(filepath.Join(home, ".whaeh"))
@@ -49,6 +57,7 @@ func Save(cfg Config) error {
 	viper.Set("model", cfg.Model)
 	viper.Set("api_key", cfg.APIKey)
 	viper.Set("base_url", cfg.BaseURL)
+	viper.Set("system_prompt", cfg.SystemPrompt)
 	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh")
 	if path == filepath.Join("", "whaeh") {
 		home, err := os.UserHomeDir()

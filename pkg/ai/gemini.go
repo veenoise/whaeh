@@ -24,6 +24,11 @@ func NewGemini(apiKey, baseURL string) *Gemini {
 
 func (p *Gemini) StreamCompletion(ctx context.Context, req ProviderRequest, out io.Writer) error {
 	body := map[string]any{"contents": []map[string]any{{"parts": []map[string]string{{"text": promptWithContext(req)}}}}}
+	if req.SystemPrompt != "" {
+		body["system_instruction"] = map[string]any{
+			"parts": []map[string]string{{"text": req.SystemPrompt}},
+		}
+	}
 	url := fmt.Sprintf("%s/models/%s:streamGenerateContent?alt=sse&key=%s", p.baseURL, req.Model, p.apiKey)
 	resp, err := doJSON(ctx, p.client, http.MethodPost, url, nil, body)
 	if err != nil {
