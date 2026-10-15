@@ -55,4 +55,37 @@ func TestConfigPath(t *testing.T) {
 			t.Errorf("got %s, want %s", path, expectedHome)
 		}
 	}
+
+	custom := "/tmp/custom-config.yaml"
+	path, err = ConfigPath(custom)
+	if err != nil || path != custom {
+		t.Errorf("got %s, want %s", path, custom)
+	}
+}
+
+func TestConfigOverrideFile(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "custom.yaml")
+	want := Config{
+		Provider:     "openai",
+		Model:        "gpt-4o",
+		APIKey:       "custom-key",
+		BaseURL:      "https://custom-url",
+		SystemPrompt: "custom prompt",
+	}
+
+	savedPath, err := Save(want, tempFile)
+	if err != nil {
+		t.Fatalf("Save with override failed: %v", err)
+	}
+	if savedPath != tempFile {
+		t.Fatalf("expected savedPath %s, got %s", tempFile, savedPath)
+	}
+
+	got, err := Load(tempFile)
+	if err != nil {
+		t.Fatalf("Load with override failed: %v", err)
+	}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
 }

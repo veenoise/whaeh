@@ -28,7 +28,7 @@ var configSetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Short: "Set a configuration value",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load()
+		cfg, err := config.Load(cfgFile)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ var configSetCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("unknown setting %q", args[0])
 		}
-		target, err := config.Save(cfg)
+		target, err := config.Save(cfg, cfgFile)
 		if err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
@@ -56,7 +56,7 @@ var configSetCmd = &cobra.Command{
 }
 
 func runInteractiveConfig(cmd *cobra.Command) error {
-	cfg, err := config.Load()
+	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func runInteractiveConfig(cmd *cobra.Command) error {
 		cfg.SystemPrompt = updatedPrompt
 	}
 
-	target, err := config.Save(cfg)
+	target, err := config.Save(cfg, cfgFile)
 	if err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
@@ -226,5 +226,11 @@ func editInEditor(currentPrompt string, reader *bufio.Reader, cmd *cobra.Command
 }
 
 func init() {
+	origHelp := configCmd.HelpFunc()
+	configCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		path, _ := config.ConfigPath(cfgFile)
+		c.Long = fmt.Sprintf("Manage whaeh configuration.\n\nConfiguration file:\n  %s", path)
+		origHelp(c, args)
+	})
 	configCmd.AddCommand(configSetCmd)
 }

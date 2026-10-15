@@ -23,7 +23,10 @@ type Config struct {
 	SystemPrompt string `mapstructure:"system_prompt"`
 }
 
-func ConfigPath() (string, error) {
+func ConfigPath(override ...string) (string, error) {
+	if len(override) > 0 && override[0] != "" {
+		return override[0], nil
+	}
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, "whaeh", "config.yaml"), nil
 	}
@@ -34,7 +37,7 @@ func ConfigPath() (string, error) {
 	return filepath.Join(home, ".whaeh", "config.yaml"), nil
 }
 
-func Load() (Config, error) {
+func Load(override ...string) (Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.SetEnvPrefix("WHAEH")
@@ -43,15 +46,19 @@ func Load() (Config, error) {
 	viper.SetDefault("model", "llama3.2")
 	viper.SetDefault("base_url", "")
 	viper.SetDefault("system_prompt", DefaultSystemPrompt)
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		viper.AddConfigPath(filepath.Join(xdg, "whaeh"))
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		viper.AddConfigPath(filepath.Join(home, ".whaeh"))
+	if len(override) > 0 && override[0] != "" {
+		viper.SetConfigFile(override[0])
+	} else {
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			viper.AddConfigPath(filepath.Join(xdg, "whaeh"))
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			viper.AddConfigPath(filepath.Join(home, ".whaeh"))
+		}
 	}
 	if err := viper.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
-		if !isConfigNotFound(err, &notFound) {
+		if !isConfigNotFound(err, &notFound) && !errors.Is(err, os.ErrNotExist) {
 			return Config{}, fmt.Errorf("read config: %w", err)
 		}
 	}
@@ -65,8 +72,8 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-func Save(cfg Config) (string, error) {
-	target, err := ConfigPath()
+func Save(cfg Config, override ...string) (string, error) {
+	target, err := ConfigPath(override...)
 	if err != nil {
 		return "", err
 	}
