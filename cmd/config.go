@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ var configSetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "configuration saved to %s\n", target)
+		fmt.Fprintf(cmd.OutOrStdout(), "configuration saved to %s\n", linkPath(target))
 		return nil
 	},
 }
@@ -165,7 +166,7 @@ func runInteractiveConfig(cmd *cobra.Command) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "\n✓ Configuration saved to %s\n", target)
+	fmt.Fprintf(cmd.OutOrStdout(), "\n✓ Configuration saved to %s\n", linkPath(target))
 	return nil
 }
 
@@ -225,11 +226,23 @@ func editInEditor(currentPrompt string, reader *bufio.Reader, cmd *cobra.Command
 	return result, nil
 }
 
+func linkPath(path string) string {
+	if os.Getenv("TERM") == "dumb" {
+		return path
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+	host, _ := os.Hostname()
+	return fmt.Sprintf("\x1b]8;;file://%s%s\x1b\\%s\x1b]8;;\x1b\\", host, abs, path)
+}
+
 func init() {
 	origHelp := configCmd.HelpFunc()
 	configCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		path, _ := config.ConfigPath(cfgFile)
-		c.Long = fmt.Sprintf("Manage whaeh configuration.\n\nConfiguration file:\n  %s", path)
+		c.Long = fmt.Sprintf("Manage whaeh configuration.\n\nConfiguration file:\n  %s", linkPath(path))
 		origHelp(c, args)
 	})
 	configCmd.AddCommand(configSetCmd)
