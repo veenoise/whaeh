@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	cfgFile      string
 	filePath     string
 	model        string
 	provider     string
@@ -27,7 +28,7 @@ var rootCmd = &cobra.Command{
 	Short: "Ask an AI about stdin or a file",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load()
+		cfg, err := config.Load(cfgFile)
 		if err != nil {
 			return err
 		}
@@ -76,6 +77,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path")
 	rootCmd.Flags().StringVarP(&filePath, "file", "f", "", "read context from a file")
 	rootCmd.Flags().StringVarP(&model, "model", "m", "", "model override")
 	rootCmd.Flags().StringVarP(&provider, "provider", "p", "", "provider override (gemini, openai, ollama)")
