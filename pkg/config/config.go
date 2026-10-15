@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 const DefaultSystemPrompt = `You are a Unix CLI assistant embedded in a command-line pipeline.
@@ -16,11 +17,45 @@ const DefaultSystemPrompt = `You are a Unix CLI assistant embedded in a command-
 - Format output with clean, readable Markdown for terminal display.`
 
 type Config struct {
-	Provider     string `mapstructure:"provider"`
-	Model        string `mapstructure:"model"`
-	APIKey       string `mapstructure:"api_key"`
-	BaseURL      string `mapstructure:"base_url"`
-	SystemPrompt string `mapstructure:"system_prompt"`
+	Provider     string `yaml:"provider,omitempty" mapstructure:"provider"`
+	Model        string `yaml:"model,omitempty" mapstructure:"model"`
+	APIKey       string `yaml:"api_key,omitempty" mapstructure:"api_key"`
+	BaseURL      string `yaml:"base_url,omitempty" mapstructure:"base_url"`
+	SystemPrompt string `yaml:"system_prompt,omitempty" mapstructure:"system_prompt"`
+}
+
+type Profile struct {
+	Provider     string `yaml:"provider" mapstructure:"provider"`
+	Model        string `yaml:"model" mapstructure:"model"`
+	APIKey       string `yaml:"api_key,omitempty" mapstructure:"api_key"`
+	BaseURL      string `yaml:"base_url" mapstructure:"base_url"`
+	SystemPrompt string `yaml:"system_prompt" mapstructure:"system_prompt"`
+}
+
+type File struct {
+	ActiveProfile string             `yaml:"active_profile,omitempty"`
+	Profiles      map[string]Profile `yaml:"profiles,omitempty"`
+	Config        `yaml:",inline"`
+}
+
+func (p Profile) Config() Config {
+	return Config{
+		Provider:     p.Provider,
+		Model:        p.Model,
+		APIKey:       p.APIKey,
+		BaseURL:      p.BaseURL,
+		SystemPrompt: p.SystemPrompt,
+	}
+}
+
+func ProfileFromConfig(cfg Config) Profile {
+	return Profile{
+		Provider:     cfg.Provider,
+		Model:        cfg.Model,
+		APIKey:       cfg.APIKey,
+		BaseURL:      cfg.BaseURL,
+		SystemPrompt: cfg.SystemPrompt,
+	}
 }
 
 func ConfigPath(override ...string) (string, error) {
@@ -30,49 +65,54 @@ func ConfigPath(override ...string) (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, "whaeh", "config.yaml"), nil
 	}
-	home, err := os.UserHomeDir()
+	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".whaeh", "config.yaml"), nil
+	return filepath.Join(configDir, "whaeh", "config.yaml"), nil
 }
 
 func Load(override ...string) (Config, error) {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix("WHAEH")
-	viper.AutomaticEnv()
-	viper.SetDefault("provider", "ollama")
-	viper.SetDefault("model", "llama3.2")
-	viper.SetDefault("base_url", "")
-	viper.SetDefault("system_prompt", DefaultSystemPrompt)
-	if len(override) > 0 && override[0] != "" {
-		viper.SetConfigFile(override[0])
-	} else {
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			viper.AddConfigPath(filepath.Join(xdg, "whaeh"))
+	doc, err := LoadFile(override...)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg := doc.Config
+	if len(doc.Profiles) > 0 {
+		name := doc.ActiveProfile
+		if _, ok := doc.Profiles[name]; !ok {
+			names := ProfileNames(doc)
+			name = names[0]
 		}
-		if home, err := os.UserHomeDir(); err == nil {
-			viper.AddConfigPath(filepath.Join(home, ".whaeh"))
-		}
+		cfg = doc.Profiles[name].Config()
 	}
-	if err := viper.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !isConfigNotFound(err, &notFound) && !errors.Is(err, os.ErrNotExist) {
-			return Config{}, fmt.Errorf("read config: %w", err)
-		}
-	}
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return Config{}, fmt.Errorf("decode config: %w", err)
-	}
-	if cfg.APIKey == "" {
-		cfg.APIKey = os.Getenv(providerEnv(cfg.Provider))
-	}
+	applyDefaults(&cfg)
 	return cfg, nil
 }
 
-func Save(cfg Config, override ...string) (string, error) {
+func LoadFile(override ...string) (File, error) {
+	target, err := ConfigPath(override...)
+	if err != nil {
+		return File{}, err
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return File{Profiles: map[string]Profile{}}, nil
+		}
+		return File{}, fmt.Errorf("read config: %w", err)
+	}
+	var doc File
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return File{}, fmt.Errorf("decode config: %w", err)
+	}
+	if doc.Profiles == nil {
+		doc.Profiles = map[string]Profile{}
+	}
+	return doc, nil
+}
+
+func SaveFile(doc File, override ...string) (string, error) {
 	target, err := ConfigPath(override...)
 	if err != nil {
 		return "", err
@@ -80,25 +120,51 @@ func Save(cfg Config, override ...string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 		return "", err
 	}
-	viper.Set("provider", cfg.Provider)
-	viper.Set("model", cfg.Model)
-	viper.Set("api_key", cfg.APIKey)
-	viper.Set("base_url", cfg.BaseURL)
-	viper.Set("system_prompt", cfg.SystemPrompt)
-	return target, viper.WriteConfigAs(target)
-}
-
-func providerEnv(provider string) string {
-	switch provider {
-	case "gemini":
-		return "GEMINI_API_KEY"
-	case "openai":
-		return "OPENAI_API_KEY"
-	default:
-		return ""
+	data, err := yaml.Marshal(doc)
+	if err != nil {
+		return "", fmt.Errorf("encode config: %w", err)
 	}
+	if err := os.WriteFile(target, data, 0o600); err != nil {
+		return "", err
+	}
+	return target, nil
 }
 
-func isConfigNotFound(err error, target *viper.ConfigFileNotFoundError) bool {
-	return errors.As(err, target)
+func ProfileNames(doc File) []string {
+	names := make([]string, 0, len(doc.Profiles))
+	for name := range doc.Profiles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func Save(cfg Config, override ...string) (string, error) {
+	doc, err := LoadFile(override...)
+	if err != nil {
+		return "", err
+	}
+	if len(doc.Profiles) > 0 {
+		name := doc.ActiveProfile
+		if _, ok := doc.Profiles[name]; !ok {
+			name = ProfileNames(doc)[0]
+			doc.ActiveProfile = name
+		}
+		doc.Profiles[name] = ProfileFromConfig(cfg)
+		return SaveFile(doc, override...)
+	}
+	doc.Config = cfg
+	return SaveFile(doc, override...)
+}
+
+func applyDefaults(cfg *Config) {
+	if cfg.Provider == "" {
+		cfg.Provider = "ollama"
+	}
+	if cfg.Model == "" {
+		cfg.Model = "llama3.2"
+	}
+	if cfg.SystemPrompt == "" {
+		cfg.SystemPrompt = DefaultSystemPrompt
+	}
 }

@@ -7,8 +7,6 @@ import (
 )
 
 func TestConfigLoadDefaultSystemPrompt(t *testing.T) {
-	t.Setenv("WHAEH_SYSTEM_PROMPT", "")
-
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
@@ -18,15 +16,15 @@ func TestConfigLoadDefaultSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestConfigEnvSystemPrompt(t *testing.T) {
+func TestConfigEnvironmentSystemPromptIgnored(t *testing.T) {
 	t.Setenv("WHAEH_SYSTEM_PROMPT", "Custom prompt")
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
-	if cfg.SystemPrompt != "Custom prompt" {
-		t.Errorf("expected 'Custom prompt', got %q", cfg.SystemPrompt)
+	if cfg.SystemPrompt != DefaultSystemPrompt {
+		t.Errorf("expected environment value to be ignored, got %q", cfg.SystemPrompt)
 	}
 }
 
@@ -44,13 +42,18 @@ func TestConfigPath(t *testing.T) {
 	}
 
 	t.Setenv("XDG_CONFIG_HOME", "")
-	home, err := os.UserHomeDir()
+	_, err = os.UserHomeDir()
 	if err == nil {
 		path, err = ConfigPath()
 		if err != nil {
 			t.Fatalf("ConfigPath() without XDG failed: %v", err)
 		}
-		expectedHome := filepath.Join(home, ".whaeh", "config.yaml")
+		var expectedHome string
+		expectedHome, err = os.UserConfigDir()
+		if err != nil {
+			t.Fatalf("UserConfigDir() failed: %v", err)
+		}
+		expectedHome = filepath.Join(expectedHome, "whaeh", "config.yaml")
 		if path != expectedHome {
 			t.Errorf("got %s, want %s", path, expectedHome)
 		}
@@ -87,5 +90,86 @@ func TestConfigOverrideFile(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadActiveProfile(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "config.yaml")
+	doc := File{
+		ActiveProfile: "work",
+		Profiles: map[string]Profile{
+			"default": {
+				Provider: "ollama",
+				Model:    "llama3.2",
+			},
+			"work": {
+				Provider:     "openai",
+				Model:        "gpt-4o",
+				BaseURL:      "https://api.openai.com/v1",
+				SystemPrompt: "work prompt",
+			},
+		},
+	}
+	if _, err := SaveFile(doc, tempFile); err != nil {
+		t.Fatalf("SaveFile() failed: %v", err)
+	}
+
+	got, err := Load(tempFile)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if got.Provider != "openai" || got.Model != "gpt-4o" || got.SystemPrompt != "work prompt" {
+		t.Fatalf("Load() returned wrong active profile: %+v", got)
+	}
+}
+
+func TestProfileRoundTripPreservesProfiles(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "config.yaml")
+	doc := File{
+		ActiveProfile: "default",
+		Profiles: map[string]Profile{
+			"default": {Provider: "openai", Model: "gpt-4o", APIKey: "secret"},
+			"local":   {Provider: "ollama", Model: "llama3.2"},
+		},
+	}
+	if _, err := SaveFile(doc, tempFile); err != nil {
+		t.Fatalf("SaveFile() failed: %v", err)
+	}
+	if _, err := Save(Config{Provider: "openai", Model: "gpt-4.1"}, tempFile); err != nil {
+		t.Fatalf("Save() failed: %v", err)
+	}
+	got, err := LoadFile(tempFile)
+	if err != nil {
+		t.Fatalf("LoadFile() failed: %v", err)
+	}
+	if len(got.Profiles) != 2 {
+		t.Fatalf("expected two profiles, got %d", len(got.Profiles))
+	}
+	if got.Profiles["local"].Provider != "ollama" {
+		t.Fatal("Save() changed inactive profile")
+	}
+	if got.Profiles["default"].Model != "gpt-4.1" {
+		t.Fatalf("Save() did not update active profile: %+v", got.Profiles["default"])
+	}
+}
+
+func TestLoadMissingActiveProfileFallsBackToSortedName(t *testing.T) {
+	tempFile := filepath.Join(t.TempDir(), "config.yaml")
+	doc := File{
+		ActiveProfile: "missing",
+		Profiles: map[string]Profile{
+			"zulu":  {Provider: "z"},
+			"alpha": {Provider: "a"},
+		},
+	}
+	if _, err := SaveFile(doc, tempFile); err != nil {
+		t.Fatalf("SaveFile() failed: %v", err)
+	}
+	got, err := Load(tempFile)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if got.Provider != "a" {
+		t.Fatalf("expected alpha fallback, got %q", got.Provider)
 	}
 }

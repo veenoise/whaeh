@@ -15,34 +15,21 @@ import (
 )
 
 var (
-	cfgFile      string
-	filePath     string
-	model        string
-	provider     string
-	systemPrompt string
-	raw          bool
+	filePath string
+	raw      bool
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "whaeh [query]",
+	Use:   "whaeh [query] --file <path>",
 	Short: "Ask an AI about stdin or a file",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load(cfgFile)
+		cfg, err := config.Load()
 		if err != nil {
 			return err
 		}
-		if provider != "" {
-			cfg.Provider = provider
-		}
-		if model != "" {
-			cfg.Model = model
-		}
-		if systemPrompt != "" {
-			cfg.SystemPrompt = systemPrompt
-		}
 		if cfg.Provider == "" {
-			return fmt.Errorf("no provider configured; use --provider or `whaeh config set provider <name>`")
+			return fmt.Errorf("no provider configured; use `whaeh config`")
 		}
 		contextText, err := input.ReadContext(filePath)
 		if err != nil {
@@ -77,12 +64,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path")
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.Flags().StringVarP(&filePath, "file", "f", "", "read context from a file")
-	rootCmd.Flags().StringVarP(&model, "model", "m", "", "model override")
-	rootCmd.Flags().StringVarP(&provider, "provider", "p", "", "provider override (gemini, openai, ollama)")
-	rootCmd.Flags().StringVarP(&systemPrompt, "system", "s", "", "system prompt override")
-	rootCmd.Flags().BoolVar(&raw, "raw", false, "disable terminal markdown rendering")
+	rootCmd.Flags().BoolVarP(&raw, "raw", "r", false, "disable terminal markdown rendering")
 	rootCmd.AddCommand(configCmd, versionCmd)
 }
 
