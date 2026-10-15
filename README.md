@@ -60,41 +60,43 @@ Ask about piped input or a file:
 
 ```sh
 man tar | whaeh "how do I create a gzipped archive?"
-whaeh --file README.md "summarize this"
-```
-
-For a one-off provider or model, use command-line flags:
-
-```sh
-whaeh --provider ollama --model llama3.2 "explain this"
+whaeh "summarize this" --file README.md
 ```
 
 ## Configuration
 
-Configuration is read from `~/.whaeh/config.yaml`, or from
-`$XDG_CONFIG_HOME/whaeh/config.yaml` when `XDG_CONFIG_HOME` is set.
+Configuration is read from the OS config directory, under `whaeh/config.yaml`.
+On Unix, `XDG_CONFIG_HOME` is honored.
 
-### Configure with the command line
+Interactive configuration supports multiple profiles:
 
-```sh
-whaeh config set provider openai
-whaeh config set model gpt-4o-mini
-whaeh config set api_key "$OPENAI_API_KEY"
+```yaml
+active_profile: default
+profiles:
+  default:
+    provider: openai
+    model: gpt-4o
+    api_key: sk-random
+    base_url:
+    system_prompt: You are a helpful assistant.
 ```
 
-Supported settings are `provider`, `model`, `api_key`, and `base_url`.
+Run `whaeh config` to manage profiles:
 
-### Configure with environment variables
+- Use `↑`/`↓` to select a profile.
+- Select `+ Create new profile` to add one.
+- Selected profiles show `Set Active`, `Edit`, and `Delete` actions.
+- Use `←`/`→` to select an action, then press `Enter`.
+- Select `Exit` or press `Esc` to leave interactive configuration.
 
-```sh
-export WHAEH_PROVIDER=gemini
-export WHAEH_MODEL=gemini-2.5-flash
-export GEMINI_API_KEY="your-api-key"
-```
+When no profiles exist, the selector opens with `+ Create new profile`
+highlighted. A single profile becomes active automatically. Deleting the
+active profile selects the first remaining profile. If no profiles remain, the
+selector opens again without starting profile creation automatically.
 
-API keys are read from `GEMINI_API_KEY` or `OPENAI_API_KEY` when the selected
-provider does not have an `api_key` saved in the configuration file. Ollama
-does not require an API key.
+Profile creation and editing prompt for profile name, provider, API key, model,
+base URL, and system prompt. Provider uses a dropdown. API key input is hidden.
+Press `Esc` during creation or editing to cancel without saving changes.
 
 The default base URLs are:
 
@@ -104,21 +106,13 @@ The default base URLs are:
 | Gemini | `https://generativelanguage.googleapis.com/v1beta` |
 | OpenAI | `https://api.openai.com/v1` |
 
-Override a provider's base URL with `WHAEH_BASE_URL` or:
-
-```sh
-whaeh config set base_url "https://example.com/v1"
-```
-
 ## Command reference
 
 ```text
 whaeh [query]                         Ask about stdin or a file
-whaeh --file, -f <path> [query]       Read context from a file
-whaeh --provider, -p <name> [query]   Override the provider
-whaeh --model, -m <name> [query]      Override the model
-whaeh --raw [query]                   Disable terminal markdown rendering
-whaeh config set <key> <value>        Save a configuration value
+whaeh [query] --file, -f <path>       Read context from a file
+whaeh [query] --raw, -r               Disable terminal markdown rendering
+whaeh config                          Manage interactive profiles
 whaeh version                         Print the version
 ```
 
