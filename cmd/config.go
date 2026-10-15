@@ -46,10 +46,11 @@ var configSetCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("unknown setting %q", args[0])
 		}
-		if err := config.Save(cfg); err != nil {
+		target, err := config.Save(cfg)
+		if err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), "configuration saved")
+		fmt.Fprintf(cmd.OutOrStdout(), "configuration saved to %s\n", target)
 		return nil
 	},
 }
@@ -159,11 +160,12 @@ func runInteractiveConfig(cmd *cobra.Command) error {
 		cfg.SystemPrompt = updatedPrompt
 	}
 
-	if err := config.Save(cfg); err != nil {
+	target, err := config.Save(cfg)
+	if err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "\n✓ Configuration saved successfully.")
+	fmt.Fprintf(cmd.OutOrStdout(), "\n✓ Configuration saved to %s\n", target)
 	return nil
 }
 

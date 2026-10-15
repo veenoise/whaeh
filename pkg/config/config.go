@@ -23,6 +23,17 @@ type Config struct {
 	SystemPrompt string `mapstructure:"system_prompt"`
 }
 
+func ConfigPath() (string, error) {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "whaeh", "config.yaml"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".whaeh", "config.yaml"), nil
+}
+
 func Load() (Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -32,7 +43,9 @@ func Load() (Config, error) {
 	viper.SetDefault("model", "llama3.2")
 	viper.SetDefault("base_url", "")
 	viper.SetDefault("system_prompt", DefaultSystemPrompt)
-	viper.AddConfigPath(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh"))
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		viper.AddConfigPath(filepath.Join(xdg, "whaeh"))
+	}
 	if home, err := os.UserHomeDir(); err == nil {
 		viper.AddConfigPath(filepath.Join(home, ".whaeh"))
 	}
@@ -52,24 +65,20 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-func Save(cfg Config) error {
+func Save(cfg Config) (string, error) {
+	target, err := ConfigPath()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		return "", err
+	}
 	viper.Set("provider", cfg.Provider)
 	viper.Set("model", cfg.Model)
 	viper.Set("api_key", cfg.APIKey)
 	viper.Set("base_url", cfg.BaseURL)
 	viper.Set("system_prompt", cfg.SystemPrompt)
-	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "whaeh")
-	if path == filepath.Join("", "whaeh") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		path = filepath.Join(home, ".whaeh")
-	}
-	if err := os.MkdirAll(path, 0o700); err != nil {
-		return err
-	}
-	return viper.WriteConfigAs(filepath.Join(path, "config.yaml"))
+	return target, viper.WriteConfigAs(target)
 }
 
 func providerEnv(provider string) string {
