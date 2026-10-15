@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	filePath string
-	model    string
-	provider string
-	raw      bool
+	filePath     string
+	model        string
+	provider     string
+	systemPrompt string
+	raw          bool
 )
 
 var rootCmd = &cobra.Command{
@@ -35,6 +36,9 @@ var rootCmd = &cobra.Command{
 		}
 		if model != "" {
 			cfg.Model = model
+		}
+		if systemPrompt != "" {
+			cfg.SystemPrompt = systemPrompt
 		}
 		if cfg.Provider == "" {
 			return fmt.Errorf("no provider configured; use --provider or `whaeh config set provider <name>`")
@@ -53,9 +57,10 @@ var rootCmd = &cobra.Command{
 			processing = startLoader(os.Stderr)
 		}
 		err = p.StreamCompletion(context.Background(), ai.ProviderRequest{
-			Prompt:  argsString(args),
-			Context: contextText,
-			Model:   cfg.Model,
+			Prompt:       argsString(args),
+			Context:      contextText,
+			Model:        cfg.Model,
+			SystemPrompt: cfg.SystemPrompt,
 		}, &response)
 		if err != nil {
 			if processing != nil {
@@ -74,6 +79,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&filePath, "file", "f", "", "read context from a file")
 	rootCmd.Flags().StringVarP(&model, "model", "m", "", "model override")
 	rootCmd.Flags().StringVarP(&provider, "provider", "p", "", "provider override (gemini, openai, ollama)")
+	rootCmd.Flags().StringVarP(&systemPrompt, "system", "s", "", "system prompt override")
 	rootCmd.Flags().BoolVar(&raw, "raw", false, "disable terminal markdown rendering")
 	rootCmd.AddCommand(configCmd, versionCmd)
 }

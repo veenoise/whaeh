@@ -22,9 +22,15 @@ func NewOpenAI(apiKey, baseURL string) *OpenAI {
 }
 
 func (p *OpenAI) StreamCompletion(ctx context.Context, req ProviderRequest, out io.Writer) error {
+	var messages []map[string]string
+	if req.SystemPrompt != "" {
+		messages = append(messages, map[string]string{"role": "system", "content": req.SystemPrompt})
+	}
+	messages = append(messages, map[string]string{"role": "user", "content": promptWithContext(req)})
+
 	body := map[string]any{
 		"model": req.Model, "stream": true,
-		"messages": []map[string]string{{"role": "user", "content": promptWithContext(req)}},
+		"messages": messages,
 	}
 	resp, err := doJSON(ctx, p.client, http.MethodPost, p.baseURL+"/chat/completions",
 		map[string]string{"Authorization": "Bearer " + p.apiKey}, body)

@@ -13,7 +13,7 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:   "set [provider|model|api_key|base_url] [value]",
+	Use:   "set [provider|model|api_key|base_url|system_prompt] [value]",
 	Args:  cobra.ExactArgs(2),
 	Short: "Set a configuration value",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -30,6 +30,8 @@ var configSetCmd = &cobra.Command{
 			cfg.APIKey = args[1]
 		case "base_url":
 			cfg.BaseURL = args[1]
+		case "system_prompt":
+			cfg.SystemPrompt = args[1]
 		default:
 			return fmt.Errorf("unknown setting %q", args[0])
 		}

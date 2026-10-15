@@ -8,9 +8,10 @@ import (
 )
 
 type ProviderRequest struct {
-	Prompt  string
-	Context string
-	Model   string
+	Prompt       string
+	Context      string
+	Model        string
+	SystemPrompt string
 }
 
 type Provider interface {

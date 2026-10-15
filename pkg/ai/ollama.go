@@ -22,6 +22,9 @@ func NewOllama(baseURL string) *Ollama {
 
 func (p *Ollama) StreamCompletion(ctx context.Context, req ProviderRequest, out io.Writer) error {
 	body := map[string]any{"model": req.Model, "prompt": promptWithContext(req), "stream": true}
+	if req.SystemPrompt != "" {
+		body["system"] = req.SystemPrompt
+	}
 	resp, err := doJSON(ctx, p.client, http.MethodPost, p.baseURL+"/api/generate", nil, body)
 	if err != nil {
 		return err
